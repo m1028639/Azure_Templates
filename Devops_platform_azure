@@ -1,0 +1,902 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "storageAccWeb": {
+      "type": "string",
+	  "defaultValue":"webstore901",
+      "metadata": {
+        "description": "Unique DNS Name for the Storage Account where the Virtual Machine's disks will be placed."
+      }
+    },
+    "storageAccAPP": {
+      "type": "string",
+	  "defaultValue":"appstore902",
+      "metadata": {
+        "description": "Unique DNS Name for the Storage Account where the Virtual Machine's disks will be placed."
+      }
+    },
+    "storageAccDB": {
+      "type": "string",
+	  "defaultValue":"dbstore903msql",
+      "metadata": {
+        "description": "Unique DNS Name for the Storage Account where the Virtual Machine's disks will be placed."
+      }
+    },
+    "storageAccSonar": {
+      "type": "string",
+	  "defaultValue":"sonarstore904",
+      "metadata": {
+        "description": "Unique DNS Name for the Storage Account where the Virtual Machine's disks will be placed."
+      }
+    },
+    "location": {
+      "type": "string",
+	  "defaultValue":"Southeast Asia",
+      "metadata": {
+        "description": "The location where the Virtual Machine will be deployed."
+      },
+      "allowedValues": [
+        "West US",
+        "East US",
+        "Southeast Asia",
+        "East Asia",
+        "West Europe"
+      ]
+    },
+    "adminUsername": {
+      "type": "string",
+"defaultValue":"sysadmin",
+      "metadata": {
+        "description": "User name for the Virtual Machine."
+      }
+    },
+    "adminPassword": {
+      "type": "securestring",
+	  "defaultValue":"Welcome@123",
+      "metadata": {
+        "description": "Password for the Virtual Machine."
+      }
+    },
+    "dnsNameForNginx": {
+      "type": "string",
+      "defaultValue": "clientnginx01",
+      "metadata": {
+        "description": "Unique DNS Name for the Public IP used to access the Virtual Machine."
+      }
+    },
+    "dnsNameForSonar": {
+      "type": "string",
+      "defaultValue": "clientsonar01",
+      "metadata": {
+        "description": "Unique DNS Name for the Public IP used to access the Virtual Machine."
+      }
+    },
+    "dnsNameForDB": {
+      "type": "string",
+      "defaultValue": "clientmysqldb01",
+      "metadata": {
+        "description": "Unique DNS Name for the Public IP used to access the Virtual Machine."
+      }
+    },
+    "dnsNameForJenkins": {
+      "type": "string",
+      "defaultValue": "clientjenkins01",
+      "metadata": {
+        "description": "Unique DNS Name for the Public IP used to access the Virtual Machine."
+      }
+    },
+    "ubuntuOSVersion": {
+      "type": "string",
+      "defaultValue": "14.04.2-LTS",
+      "allowedValues": [
+        "12.04.2-LTS",
+        "12.04.3-LTS",
+        "12.04.4-LTS",
+        "12.04.5-LTS",
+        "12.10",
+        "14.04.2-LTS",
+        "14.10",
+        "15.04"
+      ],
+      "metadata": {
+        "description": "The Ubuntu version for the VM. This will pick a fully patched image of this given Ubuntu version. Allowed values: 12.04.2-LTS, 12.04.3-LTS, 12.04.4-LTS, 12.04.5-LTS, 12.10, 14.04.2-LTS, 14.10, 15.04."
+      }
+    },
+    "addressPrefix": {
+      "type": "string",
+      "defaultValue": "10.0.0.0/16",
+      "metadata": {
+        "description": "The CIDR address space for your Virtual Network in Azure"
+      }
+    },
+    "Public_SubnetPrefix": {
+      "type": "string",
+      "defaultValue": "10.0.0.0/24",
+      "metadata": {
+        "description": "This is CIDR prefix for the FrontEnd Subnet"
+      }
+    },
+    "App_SubnetPrefix": {
+      "type": "string",
+      "defaultValue": "10.0.1.0/24",
+      "metadata": {
+        "description": "This is CIDR prefix for the Application Subnet"
+      }
+    },
+    "DB_SubnetPrefix": {
+      "type": "string",
+      "defaultValue": "10.0.2.0/24",
+      "metadata": {
+        "description": "This is CIDR prefix for the Database Subnet"
+      }
+    },
+    "WebNSGName": {
+      "type": "string",
+      "defaultValue": "Web_NSG",
+      "metadata": {
+        "description": "This is name of the networkSecurityGroup that will be assigned to Web Subnet"
+      }
+    },
+    "AppNSGName": {
+      "type": "string",
+      "defaultValue": "App_NSG",
+      "metadata": {
+        "description": "This is name of the networkSecurityGroup that will be assigned to Application Subnet"
+      }
+    },
+    "DBNSGName": {
+      "type": "string",
+      "defaultValue": "DB_NSG",
+      "metadata": {
+        "description": "This is name of the networkSecurityGroup that will be assigned to Database Subnet"
+      }
+    }
+  },
+  "variables": {
+    "imagePublisher": "Canonical",
+    "imageOffer": "UbuntuServer",
+    "OSDiskName": "osdiskfordevops",
+    "nicNameweb": "nginxVMNic",
+    "nicNamejenkins": "jenkinsVMNic",
+    "nicNamesonar": "sonarVMNic",
+    "dbnicName": "mysqlvmnic",
+    "subnetFE": "SubnetFE",
+    "subnetApp": "SubnetAPP",
+    "subnetDB": "SubnetDB",
+    "storageAccountType": "Standard_LRS",
+    "pubIPAddressNameForSonar": "pubIPaddressSonar",
+    "pubIPAddressNameForJenkins": "pubIPaddressJenkins",
+    "pubIPAddressNameForDB": "pubIPaddressDB",
+    "pubIPAddressNameForNginx": "pubIPaddnginx",
+    "publicIPAddressType": "Dynamic",
+    "vmStorageAccountContainerName": "vhds",
+    "virtualNetworkName": "Devopstool",
+    "vmNameWeb": "orchard-Nginx001",
+    "vmNamesonar": "orchard-Sonar001",
+    "vmNamejenkins": "orchard-jenkins001",
+    "vmNameDB": "orchard-Mysql001",
+    "vmSize": "Basic_A1",
+    "vnetID": "[resourceId('Microsoft.Network/virtualNetworks',variables('virtualNetworkName'))]",
+    "subnetWebRef": "[concat(variables('vnetID'),'/subnets/',variables('subnetFE'))]",
+    "subnetAppRef": "[concat(variables('vnetID'),'/subnets/',variables('subnetAPP'))]",
+    "subnetDBRef": "[concat(variables('vnetID'),'/subnets/',variables('subnetDB'))]"
+  },
+  "resources": [
+    {
+      "apiVersion": "2015-05-01-preview",
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "name": "[parameters('WebNSGName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "Allow_Webnginx",
+            "properties": {
+              "description": "Allow FE Subnet",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 100,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "web_rule",
+            "properties": {
+              "description": "Allow WEB",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "80",
+              "sourceAddressPrefix": "Internet",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 101,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "ssh_rule",
+            "properties": {
+              "description": "Allow SSH",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "22",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 102,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "tomcat_rule",
+            "properties": {
+              "description": "Allow tomcat",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "8080",
+              "sourceAddressPrefix": "Internet",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 103,
+              "direction": "Inbound"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "2015-05-01-preview",
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "name": "[parameters('AppNSGName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "Allow_Webnginx",
+            "properties": {
+              "description": "Allow FE Subnet",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 100,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Allow_FE",
+            "properties": {
+              "description": "Allow FE Subnet",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "443",
+              "sourceAddressPrefix": "10.0.0.0/24",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 101,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Allow_FEapp",
+            "properties": {
+              "description": "Allow Public Subnet",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "80",
+              "sourceAddressPrefix": "10.0.0.0/24",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 102,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Allow_FEapptom",
+            "properties": {
+              "description": "Allow FE Subnet",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "10.0.0.0/24",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 103,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "ssh_rule",
+            "properties": {
+              "description": "Allow SSH",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "22",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 104,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Allow_outdb",
+            "properties": {
+              "description": "dboutmysql",
+              "protocol": "tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 105,
+              "direction": "Outbound"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "2015-05-01-preview",
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "name": "[parameters('DBNSGName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "Allow_App",
+            "properties": {
+              "description": "Allow APP Subnet",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3306",
+              "sourceAddressPrefix": "10.0.1.0/24",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 100,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Allow_db",
+            "properties": {
+              "description": "Allow APP Subnet",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3306",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 101,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "ssh_rule",
+            "properties": {
+              "description": "Allow SSH",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "22",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 102,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "tomcat_rule",
+            "properties": {
+              "description": "Allow tomcat",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "8080",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 103,
+              "direction": "Inbound"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "name": "[parameters('storageAccWeb')]",
+      "apiVersion": "2015-05-01-preview",
+      "location": "[parameters('location')]",
+      "properties": {
+        "accountType": "[variables('storageAccountType')]"
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "name": "[parameters('storageAccSonar')]",
+      "apiVersion": "2015-05-01-preview",
+      "location": "[parameters('location')]",
+      "properties": {
+        "accountType": "[variables('storageAccountType')]"
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "name": "[parameters('storageAccAPP')]",
+      "apiVersion": "2015-05-01-preview",
+      "location": "[parameters('location')]",
+      "properties": {
+        "accountType": "[variables('storageAccountType')]"
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "name": "[parameters('storageAccDB')]",
+      "apiVersion": "2015-05-01-preview",
+      "location": "[parameters('location')]",
+      "properties": {
+        "accountType": "[variables('storageAccountType')]"
+      }
+    },
+    {
+      "apiVersion": "2015-05-01-preview",
+      "type": "Microsoft.Network/publicIPAddresses",
+      "name": "[variables('pubIPAddressNameForNginx')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "publicIPAllocationMethod": "[variables('publicIPAddressType')]",
+        "dnsSettings": {
+          "domainNameLabel": "[parameters('dnsNameForNginx')]"
+        }
+      }
+    },
+    {
+      "apiVersion": "2015-05-01-preview",
+      "type": "Microsoft.Network/publicIPAddresses",
+      "name": "[variables('pubIPAddressNameForJenkins')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "publicIPAllocationMethod": "[variables('publicIPAddressType')]",
+        "dnsSettings": {
+          "domainNameLabel": "[parameters('dnsNameForJenkins')]"
+        }
+      }
+    },
+    {
+      "apiVersion": "2015-05-01-preview",
+      "type": "Microsoft.Network/publicIPAddresses",
+      "name": "[variables('pubIPAddressNameForSonar')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "publicIPAllocationMethod": "[variables('publicIPAddressType')]",
+        "dnsSettings": {
+          "domainNameLabel": "[parameters('dnsNameForSonar')]"
+        }
+      }
+    },
+    {
+      "apiVersion": "2015-05-01-preview",
+      "type": "Microsoft.Network/publicIPAddresses",
+      "name": "[variables('pubIPAddressNameForDB')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "publicIPAllocationMethod": "[variables('publicIPAddressType')]",
+        "dnsSettings": {
+          "domainNameLabel": "[parameters('dnsNameForDB')]"
+        }
+      }
+    },
+    {
+      "apiVersion": "2015-05-01-preview",
+      "type": "Microsoft.Network/virtualNetworks",
+      "name": "[variables('virtualNetworkName')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[concat('Microsoft.Network/networkSecurityGroups/', parameters('WebNSGName'))]",
+        "[concat('Microsoft.Network/networkSecurityGroups/', parameters('AppNSGName'))]",
+        "[concat('Microsoft.Network/networkSecurityGroups/', parameters('DBNSGName'))]"
+      ],
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "[parameters('addressPrefix')]"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "[variables('subnetFE')]",
+            "properties": {
+              "addressPrefix": "[parameters('Public_SubnetPrefix')]",
+              "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('WebNSGName'))]"
+              }
+            }
+          },
+          {
+            "name": "[variables('subnetApp')]",
+            "properties": {
+              "addressPrefix": "[parameters('App_SubnetPrefix')]",
+              "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('AppNSGName'))]"
+              }
+            }
+          },
+          {
+            "name": "[variables('subnetDB')]",
+            "properties": {
+              "addressPrefix": "[parameters('DB_SubnetPrefix')]",
+              "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('DBNSGName'))]"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "2015-05-01-preview",
+      "type": "Microsoft.Network/networkInterfaces",
+      "name": "[variables('nicNameWeb')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[concat('Microsoft.Network/publicIPAddresses/', variables('pubIPAddressNameForNginx'))]",
+        "[concat('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]"
+      ],
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "publicIPAddress": {
+                "id": "[resourceId('Microsoft.Network/publicIPAddresses',variables('pubIPAddressNameForNginx'))]"
+              },
+              "subnet": {
+                "id": "[variables('subnetWebRef')]"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "2015-05-01-preview",
+      "type": "Microsoft.Network/networkInterfaces",
+      "name": "[variables('nicNamesonar')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[concat('Microsoft.Network/publicIPAddresses/', variables('pubIPAddressNameForSonar'))]",
+        "[concat('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]"
+      ],
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "publicIPAddress": {
+                "id": "[resourceId('Microsoft.Network/publicIPAddresses',variables('pubIPAddressNameForSonar'))]"
+              },
+              "subnet": {
+                "id": "[variables('subnetAppRef')]"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "2015-05-01-preview",
+      "type": "Microsoft.Network/networkInterfaces",
+      "name": "[variables('nicNamejenkins')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[concat('Microsoft.Network/publicIPAddresses/', variables('pubIPAddressNameForJenkins'))]",
+        "[concat('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]"
+      ],
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "publicIPAddress": {
+                "id": "[resourceId('Microsoft.Network/publicIPAddresses',variables('pubIPAddressNameForJenkins'))]"
+              },
+              "subnet": {
+                "id": "[variables('subnetAppRef')]"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "2015-05-01-preview",
+      "type": "Microsoft.Network/networkInterfaces",
+      "name": "[variables('dbnicName')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[concat('Microsoft.Network/publicIPAddresses/', variables('pubIPAddressNameForDB'))]",
+        "[concat('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]"
+      ],
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "publicIPAddress": {
+                "id": "[resourceId('Microsoft.Network/publicIPAddresses',variables('pubIPAddressNameForDB'))]"
+              },
+              "subnet": {
+                "id": "[variables('subnetDBRef')]"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "2015-05-01-preview",
+      "type": "Microsoft.Compute/virtualMachines",
+      "name": "[variables('vmNameDB')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[concat('Microsoft.Storage/storageAccounts/', parameters('storageAccDB'))]",
+        "[concat('Microsoft.Network/networkInterfaces/', variables('dbnicName'))]"
+      ],
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "[variables('vmSize')]"
+        },
+        "osProfile": {
+          "computername": "[variables('vmNameDB')]",
+          "adminUsername": "[parameters('adminUsername')]",
+          "adminPassword": "[parameters('adminPassword')]"
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "[variables('imagePublisher')]",
+            "offer": "[variables('imageOffer')]",
+            "sku": "[parameters('ubuntuOSVersion')]",
+            "version": "latest"
+          },
+          "osDisk": {
+            "name": "osdisk1",
+            "vhd": {
+              "uri": "[concat('http://',parameters('storageAccDB'),'.blob.core.windows.net/',variables('vmStorageAccountContainerName'),'/',variables('OSDiskName'),'.vhd')]"
+            },
+            "caching": "ReadWrite",
+            "createOption": "FromImage"
+          }
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces',variables('dbnicName'))]"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachines/extensions",
+      "name": "[concat(variables('vmNameDB'),'/dbscript')]",
+      "apiVersion": "2015-05-01-preview",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[concat('Microsoft.Compute/virtualMachines/', variables('vmNameDB'))]"
+      ],
+      "properties": {
+        "publisher": "Microsoft.OSTCExtensions",
+        "type": "CustomScriptForLinux",
+        "typeHandlerVersion": "1.2",
+        "settings": {
+          "fileUris": [
+            "https://raw.githubusercontent.com/m1028639/myscripts/master/install-mysql.sh?_sm_au_=iHHR42V3V0ktkkFv"
+          ],
+          "commandToExecute": "sh install-mysql.sh"
+        }
+      }
+    },
+    {
+      "apiVersion": "2015-05-01-preview",
+      "type": "Microsoft.Compute/virtualMachines",
+      "name": "[variables('vmNamejenkins')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[concat('Microsoft.Storage/storageAccounts/', parameters('storageAccAPP'))]",
+        "[concat('Microsoft.Network/networkInterfaces/', variables('nicNamejenkins'))]"
+      ],
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "[variables('vmSize')]"
+        },
+        "osProfile": {
+          "computername": "[variables('vmNamejenkins')]",
+          "adminUsername": "[parameters('adminUsername')]",
+          "adminPassword": "[parameters('adminPassword')]"
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "[variables('imagePublisher')]",
+            "offer": "[variables('imageOffer')]",
+            "sku": "[parameters('ubuntuOSVersion')]",
+            "version": "latest"
+          },
+          "osDisk": {
+            "name": "osdisk1",
+            "vhd": {
+              "uri": "[concat('http://',parameters('storageAccAPP'),'.blob.core.windows.net/',variables('vmStorageAccountContainerName'),'/',variables('OSDiskName'),'.vhd')]"
+            },
+            "caching": "ReadWrite",
+            "createOption": "FromImage"
+          }
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces',variables('nicNamejenkins'))]"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachines/extensions",
+      "name": "[concat(variables('vmNamejenkins'),'/appscript')]",
+      "apiVersion": "2015-05-01-preview",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[concat('Microsoft.Compute/virtualMachines/', variables('vmNamejenkins'))]"
+      ],
+      "properties": {
+        "publisher": "Microsoft.OSTCExtensions",
+        "type": "CustomScriptForLinux",
+        "typeHandlerVersion": "1.2",
+        "settings": {
+          "fileUris": [
+            "https://raw.githubusercontent.com/m1028639/myscripts/master/jenkins.sh?_sm_au_=iHH5VJMjrkHM1vRk"
+          ],
+          "commandToExecute": "sh jenkins.sh"
+        }
+      }
+    },
+    {
+      "apiVersion": "2015-05-01-preview",
+      "type": "Microsoft.Compute/virtualMachines",
+      "name": "[variables('vmNameWeb')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[concat('Microsoft.Storage/storageAccounts/', parameters('storageAccWeb'))]",
+        "[concat('Microsoft.Network/networkInterfaces/', variables('nicNameWeb'))]"
+      ],
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "[variables('vmSize')]"
+        },
+        "osProfile": {
+          "computername": "[variables('vmNameWeb')]",
+          "adminUsername": "[parameters('adminUsername')]",
+          "adminPassword": "[parameters('adminPassword')]"
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "[variables('imagePublisher')]",
+            "offer": "[variables('imageOffer')]",
+            "sku": "[parameters('ubuntuOSVersion')]",
+            "version": "latest"
+          },
+          "osDisk": {
+            "name": "osdisk1",
+            "vhd": {
+              "uri": "[concat('http://',parameters('storageAccWeb'),'.blob.core.windows.net/',variables('vmStorageAccountContainerName'),'/',variables('OSDiskName'),'.vhd')]"
+            },
+            "caching": "ReadWrite",
+            "createOption": "FromImage"
+          }
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces',variables('nicNameWeb'))]"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachines/extensions",
+      "name": "[concat(variables('vmNameWeb'),'/webscript')]",
+      "apiVersion": "2015-05-01-preview",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[concat('Microsoft.Compute/virtualMachines/', variables('vmNameWeb'))]",
+        "[concat('Microsoft.Compute/virtualMachines/', variables('vmNamejenkins'))]",
+        "[concat('Microsoft.Compute/virtualMachines/', variables('vmNamesonar'))]"
+      ],
+      "properties": {
+        "publisher": "Microsoft.OSTCExtensions",
+        "type": "CustomScriptForLinux",
+        "typeHandlerVersion": "1.2",
+        "settings": {
+          "fileUris": [
+            "https://raw.githubusercontent.com/m1028639/myscripts/master/nginx.sh?_sm_au_=iHH5VJMjrkHM1vRk"
+          ],
+          "commandToExecute": "sh nginx.sh"
+        }
+      }
+    },
+    {
+      "apiVersion": "2015-05-01-preview",
+      "type": "Microsoft.Compute/virtualMachines",
+      "name": "[variables('vmNamesonar')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[concat('Microsoft.Storage/storageAccounts/', parameters('storageAccSonar'))]",
+        "[concat('Microsoft.Network/networkInterfaces/', variables('nicNamesonar'))]"
+      ],
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "[variables('vmSize')]"
+        },
+        "osProfile": {
+          "computername": "[variables('vmNamesonar')]",
+          "adminUsername": "[parameters('adminUsername')]",
+          "adminPassword": "[parameters('adminPassword')]"
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "[variables('imagePublisher')]",
+            "offer": "[variables('imageOffer')]",
+            "sku": "[parameters('ubuntuOSVersion')]",
+            "version": "latest"
+          },
+          "osDisk": {
+            "name": "osdisk1",
+            "vhd": {
+              "uri": "[concat('http://',parameters('storageAccSonar'),'.blob.core.windows.net/',variables('vmStorageAccountContainerName'),'/',variables('OSDiskName'),'.vhd')]"
+            },
+            "caching": "ReadWrite",
+            "createOption": "FromImage"
+          }
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces',variables('nicNamesonar'))]"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachines/extensions",
+      "name": "[concat(variables('vmNamesonar'),'/webscript')]",
+      "apiVersion": "2015-05-01-preview",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[concat('Microsoft.Compute/virtualMachines/', variables('vmNamesonar'))]"
+      ],
+      "properties": {
+        "publisher": "Microsoft.OSTCExtensions",
+        "type": "CustomScriptForLinux",
+        "typeHandlerVersion": "1.2",
+        "settings": {
+          "fileUris": [
+            "https://raw.githubusercontent.com/m1028639/myscripts/master/sonar.sh?_sm_au_=iHHR42V3V0ktkkFv"
+          ],
+          "commandToExecute": "sh sonar.sh"
+        }
+      }
+    }
+  ]
+}
